@@ -97,7 +97,7 @@ L.LayerGroupSelectionHandler = function (group, options) {
 
   var handler = function (event) {
     var
-      layer = event.layer,
+      layer = event.layer || event.target,
       existing = selection(layer);
 
     if (existing == null) {
