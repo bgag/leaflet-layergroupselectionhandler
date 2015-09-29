@@ -2,6 +2,13 @@
 
 'use strict';
 
+var LayerGroupClickHandler = null;
+
+if (module && module.exports) {
+  LayerGroupClickHandler = require('leaflet-layergroupclickhandler');
+} else {
+  LayerGroupClickHandler = L.LayerGroupClickHandler;
+}
 
 /**
  * Multiselection handler for LayerGroups
@@ -9,10 +16,10 @@
  * @param options
  * @constructor
  */
-L.LayerGroupSelectionHandler = function (group, options) {
+var LayerGroupSelectionHandler = function (group, options) {
   var
     self = this,
-    clickHandler = new L.LayerGroupClickHandler(group),
+    clickHandler = new LayerGroupClickHandler(group),
     selections = [];
 
   if (options == null) {
@@ -151,3 +158,9 @@ L.LayerGroupSelectionHandler = function (group, options) {
     deselect(layer);
   };
 };
+
+if (module && module.exports) {
+  module.exports = LayerGroupSelectionHandler;
+} else {
+  L.LayerGroupSelectionHandler = LayerGroupSelectionHandler;
+}

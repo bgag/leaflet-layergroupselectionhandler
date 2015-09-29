@@ -2,7 +2,7 @@
   "name": "leaflet-layergroupselectionhandler",
   "description": "Multiselection handler for LayerGroups",
   "homepage": "https://github.com/bgag/leaflet-layergroupselectionhandler",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "keywords": [
     "leaflet"
   ],
