@@ -1,13 +1,13 @@
 /* global L:true */
 
-'use strict';
+'use strict'
 
-var LayerGroupClickHandler = null;
+var LayerGroupClickHandler = null
 
-if (module && module.exports) {
-  LayerGroupClickHandler = require('leaflet-layergroupclickhandler');
+if (typeof module !== 'undefined' && module.exports) {
+  LayerGroupClickHandler = require('leaflet-layergroupclickhandler')
 } else {
-  LayerGroupClickHandler = L.LayerGroupClickHandler;
+  LayerGroupClickHandler = L.LayerGroupClickHandler
 }
 
 /**
@@ -17,150 +17,161 @@ if (module && module.exports) {
  * @constructor
  */
 var LayerGroupSelectionHandler = function (group, options) {
-  var
-    self = this,
-    clickHandler = new LayerGroupClickHandler(group),
-    selections = [];
+  var self = this
+  var clickHandler = new LayerGroupClickHandler(group)
+  var selections = []
 
-  if (options == null) {
-    options = {};
-  }
+  options = options || {}
+  options.color = options.color || '#ff8080'
 
-  if (!('color' in options)) {
-    options.color = '#ff8080';
-  }
+  var findByBounds = function (needle, layers) {
+    var bounds = needle.getBounds()
 
-  var findByBounds = function (layers, bounds) {
+    layers = layers || self.getSelections()
+
     return layers.reduce(function (found, layer, index) {
-      // already found
-      if (found !== null) {
-        return found;
+      // if not found, chech bounds
+      if (found === -1 && bounds.equals(layer.getBounds())) {
+        return index
       }
 
-      // compare bounds
-      if (bounds.equals(layer.getBounds())) {
-        return index;
-      } else {
-        return null;
-      }
-    }, null);
-  };
+      return found
+    }, -1)
+  }
 
-  var selection = function (layer, value) {
-    var index = findByBounds(self.getSelections(), layer.getBounds());
+  var isSelected = function (layer) {
+    return findByBounds(layer) !== -1
+  }
 
-    if (index !== null) {
-      if (value === null) {
-        var toDeleted = selections[index];
-
-        selections.splice(index, 1);
-
-        return toDeleted;
-      } else {
-        if (value !== undefined) {
-          selections[index] = value;
-        }
-
-        return selections[index];
-      }
-    } else {
-      if (value !== undefined) {
-        selections.push(value);
-
-        return value;
-      } else {
-        return null;
-      }
-    }
-  };
-
-  var select = function (layer, outdated) {
-    var backup = null;
+  var buildLayerBackup = function (layer, previous) {
+    // if there is an previous selection use that backup info
+    var previousColor = previous && previous.backup.color
 
     // backup original color if available
-    if ('options' in layer && 'color' in layer.options) {
-      backup = { color: layer.options.color };
+    var layerColor = layer.options && layer.options.color
+
+    return {
+      layer: layer,
+      color: previousColor || layerColor
+    }
+  }
+
+  var buildBackup = function (layer, previous) {
+    // if it's a group layer process all sub layers
+    if (typeof layer.eachLayer !== 'undefined') {
+      var backup = []
+
+      layer.eachLayer(function (subLayer) {
+        backup.push(buildLayerBackup(subLayer))
+      })
+
+      return backup
+    } else {
+      return [buildLayerBackup(layer, previous)]
+    }
+  }
+
+  var select = function (layer, previous) {
+    var index = findByBounds(layer)
+
+    var data = {
+      layer: layer,
+      backup: buildBackup(layer, previous)
     }
 
-    // if there is an outdated selection use that backup info
-    if (outdated != null) {
-      backup = { color: outdated.backup.color };
+    // update existing data or add new data
+    if (index !== -1) {
+      selections[index] = data
+    } else {
+      selections.push(data)
     }
 
-    selection(layer, { backup: backup, layer: layer });
-
-    layer.setStyle({color: options.color});
-  };
+    layer.setStyle({color: options.color})
+  }
 
   var deselect = function (layer) {
-    if (layer != null) {
-      var toDelete = selection(layer, null);
+    var index = findByBounds(layer)
+    var data = selections[index]
 
-      toDelete.layer.setStyle({color: toDelete.backup.color});
-    } else {
-      selections.slice(0).forEach(function (selection) { deselect(selection.layer); });
-    }
-  };
+    // restore color of all layers
+    data.backup.forEach(function (backup) {
+      backup.layer.setStyle({
+        color: backup.color
+      })
+    })
+
+    selections.splice(index, 1)
+  }
 
   var handler = function (event) {
-    var
-      layer = event.layer || event.target,
-      existing = selection(layer);
+    var layer = event.layer || event.target
 
-    if (existing == null) {
-      select(layer);
+    if (!isSelected(layer)) {
+      select(layer)
 
-      if ('onSelect' in options) {
-        options.onSelect(layer);
+      if (options.onSelect) {
+        options.onSelect(layer)
       }
     } else {
-      deselect(layer);
+      deselect(layer)
 
-      if ('onDeselect' in options) {
-        options.onDeselect(layer);
+      if (options.onDeselect) {
+        options.onDeselect(layer)
       }
     }
 
-    if ('onChange' in options) {
-      options.onChange(self.getSelections());
+    if (options.onChange) {
+      options.onChange(self.getSelections())
     }
-  };
+  }
 
   this.enabled = function () {
-    return clickHandler.enabled();
-  };
+    return clickHandler.enabled()
+  }
 
   this.enable = function () {
-    clickHandler.enable(handler);
-  };
+    clickHandler.enable(handler)
+  }
 
   this.disable = function () {
-    clickHandler.disable();
-  };
+    clickHandler.disable()
+  }
 
   this.update = function (layers) {
-    clickHandler.update();
+    clickHandler.update()
 
-    layers.forEach(function (layer) {
-      var outdated = selection(layer);
+    // support group layers and arrays
+    var loop = (layers.eachLayer && layers.eachLayer.bind(layers)) || (layers.forEach && layers.forEach.bind(layers))
 
-      if (outdated != null) {
-        select(layer, outdated);
+    loop(function (layer) {
+      var index = findByBounds(layer)
+
+      if (index !== -1) {
+        select(layer, selections[index])
       }
-    });
-  };
+    })
+  }
 
   this.getSelections = function () {
-    return selections.map(function (selection) { return selection.layer; });
-  };
+    return selections.map(function (selection) {
+      return selection.layer
+    })
+  }
 
   this.deselect = function (layer) {
-    deselect(layer);
-  };
-};
+    // if no layer is given, deselect all
+    if (!layer) {
+      selections.slice(0).forEach(function (selection) {
+        deselect(selection.layer)
+      })
+    } else {
+      deselect(layer)
+    }
+  }
+}
 
-if (module && module.exports) {
-  module.exports = LayerGroupSelectionHandler;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = LayerGroupSelectionHandler
 } else {
-  L.LayerGroupSelectionHandler = LayerGroupSelectionHandler;
+  L.LayerGroupSelectionHandler = LayerGroupSelectionHandler
 }

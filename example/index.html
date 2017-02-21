@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-layergroupclickhandler/leaflet.layergroupclickhandler.js"></script>
+  <script src="../leaflet.layergroupselectionhandler.js"></script>
+</head>
+<body>
+ <div style="text-align: center;">
+  <div id="map" style="width: 1000px; height: 500px; margin: auto;"></div>
+  <textarea id="geojson" rows="20" cols="100"></textarea>
+ </div>
+
+ <script>
+   function shuffleFeatures (fc) {
+     var features = fc.features.slice()
+
+     fc.features = fc.features.map(function () {
+       var index = Math.floor(Math.random() * features.length)
+
+       return features.splice(index, 1)[0]
+     })
+
+     return fc
+   }
+
+   fetch('gemeinden.geojson').then(function (result) {
+     return result.json()
+   }).then(function (geojson) {
+     var map = L.map('map').setView([49.4832079, 8.1056785], 11)
+
+     L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+       attribution: 'Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors',
+       maxZoom: 18
+     }).addTo(map)
+
+     var layer = L.geoJSON(geojson).addTo(map)
+
+     var handler = new L.LayerGroupSelectionHandler(layer, {
+       onChange: function (layers) {
+         var json = layers.map(function (layer) {
+           return layer.toGeoJSON()
+         })
+
+         document.getElementById('geojson').innerHTML = JSON.stringify(json, null, ' ')
+
+         // simulate layer update
+
+         layer.eachLayer(function (subLayer) {
+           map.removeLayer(subLayer)
+         })
+
+         layer.addData(shuffleFeatures(geojson))
+
+         handler.update(layer)
+       }
+     })
+
+     handler.enable()
+   })
+ </script>
+</body>
+</html>
